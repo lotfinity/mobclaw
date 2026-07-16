@@ -6,6 +6,7 @@ on:
       - release/v1.0.1-polish
     paths:
       - scripts/apply_v101_polish.py
+      - scripts/fix_v101_migration.py
       - .github/workflows/apply-v101-polish.yml
   pull_request:
     branches:
@@ -26,8 +27,11 @@ jobs:
           ref: release/v1.0.1-polish
           fetch-depth: 0
 
-      - name: Apply migration
-        run: python3 scripts/apply_v101_polish.py
+      - name: Repair and apply migration
+        run: |
+          python3 scripts/fix_v101_migration.py
+          python3 scripts/apply_v101_polish.py
+          rm -f scripts/fix_v101_migration.py
 
       - name: Commit generated changes
         run: |
