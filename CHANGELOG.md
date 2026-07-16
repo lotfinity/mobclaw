@@ -7,6 +7,10 @@
 - Single-session JSON sharing directly from each session card.
 - Full-screen session debugger with timeline and raw JSON preview.
 - External JSON viewer action for inspecting the exact shared file.
+- Annotated screenshots are stored for every visual screen observation and final verification snapshot.
+- Observation events show image thumbnails that open into a full-screen preview.
+- Per-session sharing now creates a ZIP containing `session.json` and all observation screenshots.
+- Recorded model requests keep image counts but no longer duplicate base64 screenshot payloads in JSON.
 
 ### Agent flow
 
