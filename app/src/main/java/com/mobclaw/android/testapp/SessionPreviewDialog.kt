@@ -36,10 +36,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.FileProvider
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -69,10 +71,14 @@ fun SessionPreviewDialog(
     session: RecordedSession,
     onDismiss: () -> Unit,
 ) {
+    val context = LocalContext.current
     var selectedTab by remember(session.sessionId) { mutableIntStateOf(0) }
     val rawJson = remember(session) { buildSingleSessionExportJson(session) }
 
-    Dialog(onDismissRequest = onDismiss) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
         Surface(
             modifier = Modifier.fillMaxSize().padding(10.dp),
             shape = MaterialTheme.shapes.large,
@@ -130,10 +136,10 @@ fun SessionPreviewDialog(
                         label = { Text("Raw JSON") },
                     )
                     Spacer(modifier = Modifier.weight(1f))
-                    IconButton(onClick = { openRecordedSessionJson(LocalSessionContext.current, session) }) {
+                    IconButton(onClick = { openRecordedSessionJson(context, session) }) {
                         Icon(Icons.Default.OpenInNew, contentDescription = "Open JSON externally")
                     }
-                    IconButton(onClick = { shareRecordedSession(LocalSessionContext.current, session) }) {
+                    IconButton(onClick = { shareRecordedSession(context, session) }) {
                         Icon(Icons.Default.Share, contentDescription = "Share this session")
                     }
                 }
@@ -173,11 +179,6 @@ fun SessionPreviewDialog(
             }
         }
     }
-}
-
-/** Local context bridge kept private to this UI file. */
-private object LocalSessionContext {
-    lateinit var current: Context
 }
 
 @Composable

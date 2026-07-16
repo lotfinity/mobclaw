@@ -607,24 +607,35 @@ class MainActivity : ComponentActivity() {
                             onClick = { selectedSession = session },
                             modifier = Modifier.fillMaxWidth(),
                         ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Text(
-                                    session.task.take(80),
-                                    style = MaterialTheme.typography.titleSmall,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    "${session.provider} | ${session.model ?: "default"} | ${session.events.size} events",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                Text(
-                                    java.util.Date(session.startedAtEpochMs).toString(),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        session.task.take(80),
+                                        style = MaterialTheme.typography.titleSmall,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        "${session.provider} | ${session.model ?: "default"} | ${session.events.size} events",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    Text(
+                                        java.util.Date(session.startedAtEpochMs).toString(),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                IconButton(onClick = { shareRecordedSession(context, session) }) {
+                                    Icon(
+                                        Icons.Default.Share,
+                                        contentDescription = "Share this session",
+                                    )
+                                }
                             }
                         }
                     }
@@ -633,24 +644,9 @@ class MainActivity : ComponentActivity() {
         }
 
         selectedSession?.let { session ->
-            AlertDialog(
-                onDismissRequest = { selectedSession = null },
-                title = { Text("Session ${session.sessionId.take(8)}") },
-                text = {
-                    Column {
-                        Text("Task: ${session.task}", style = MaterialTheme.typography.bodyMedium)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text("Provider: ${session.provider}", style = MaterialTheme.typography.bodySmall)
-                        Text("Model: ${session.model ?: "default"}", style = MaterialTheme.typography.bodySmall)
-                        Text("Events: ${session.events.size}", style = MaterialTheme.typography.bodySmall)
-                        Text("Success: ${session.success ?: "unknown"}", style = MaterialTheme.typography.bodySmall)
-                    }
-                },
-                confirmButton = {
-                    TextButton(onClick = { selectedSession = null }) {
-                        Text("Close")
-                    }
-                },
+            SessionPreviewDialog(
+                session = session,
+                onDismiss = { selectedSession = null },
             )
         }
     }
