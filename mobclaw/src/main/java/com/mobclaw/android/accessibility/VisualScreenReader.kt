@@ -32,6 +32,8 @@ object VisualScreenReader {
         val service = MobClawAccessibilityService.instance ?: return null
         val capture = service.captureCurrentWindowBitmap() ?: return null
         val screenshot = capture.bitmap
+        val imageWidth = screenshot.width
+        val imageHeight = screenshot.height
 
         val targets = buildTargets(state, capture.sourceBounds)
         val annotated = renderMarkers(
@@ -51,8 +53,8 @@ object VisualScreenReader {
             snapshotId = state.snapshotId,
             packageName = state.packageName,
             activityName = state.activityName,
-            width = capture.bitmap.width,
-            height = capture.bitmap.height,
+            width = imageWidth,
+            height = imageHeight,
             imageDataUrl = imageDataUrl,
             targets = targets,
             capturedAt = state.timestamp,
