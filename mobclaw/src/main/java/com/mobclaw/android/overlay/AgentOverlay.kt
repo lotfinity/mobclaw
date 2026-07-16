@@ -28,6 +28,7 @@ class AgentOverlay(private val context: Context) {
 
     private val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val autoHideRunnable = Runnable { hide() }
 
     private var overlayView: View? = null
     private var statusText: TextView? = null
@@ -46,6 +47,7 @@ class AgentOverlay(private val context: Context) {
      */
     @SuppressLint("ClickableViewAccessibility")
     fun show() {
+        mainHandler.removeCallbacks(autoHideRunnable)
         if (isShowing) return
 
         mainHandler.post {
@@ -107,6 +109,7 @@ class AgentOverlay(private val context: Context) {
      * Hide and remove the overlay.
      */
     fun hide() {
+        mainHandler.removeCallbacks(autoHideRunnable)
         if (!isShowing) return
         mainHandler.post {
             overlayView?.let {
@@ -126,6 +129,11 @@ class AgentOverlay(private val context: Context) {
     }
 
     // --- Public update methods (called from any thread) ---
+
+    fun hideAfter(delayMs: Long) {
+        mainHandler.removeCallbacks(autoHideRunnable)
+        mainHandler.postDelayed(autoHideRunnable, delayMs.coerceAtLeast(0L))
+    }
 
     fun updateStatus(status: String) {
         mainHandler.post {
@@ -170,9 +178,14 @@ class AgentOverlay(private val context: Context) {
     }
 
     fun clearActions() {
+        mainHandler.removeCallbacks(autoHideRunnable)
         mainHandler.post {
             actionsContainer?.removeAllViews()
-            reasoningText?.text = ""
+            reasoningText?.apply {
+                text = ""
+                visibility = View.GONE
+            }
+            statusText?.text = "Ready"
         }
     }
 

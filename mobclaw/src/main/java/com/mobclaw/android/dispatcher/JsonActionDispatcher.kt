@@ -119,7 +119,7 @@ class JsonActionDispatcher : ActionDispatcher {
         return messages
     }
 
-    override fun shouldSendToolSpecs(): Boolean = false
+    override fun shouldSendToolSpecs(): Boolean = true
 
     private fun String.cleanAssistantText(): String {
         val cleaned = trim()
