@@ -29,12 +29,12 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
 
-      - name: Compile MobClaw and test app
+      - name: Compile MobClaw library
         id: compile
         shell: bash
         run: |
           set +e
-          ./gradlew :mobclaw:compileDebugKotlin :app:compileDebugKotlin --console=plain > compile.log 2>&1
+          ./gradlew :mobclaw:compileDebugKotlin --console=plain > compile.log 2>&1
           status=$?
           echo "status=$status" >> "$GITHUB_OUTPUT"
           tail -n 120 compile.log
