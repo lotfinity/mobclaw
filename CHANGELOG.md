@@ -1,10 +1,12 @@
 # Changelog
 
 ## 1.0.1
+
+### Session debugging
+
 - Single-session JSON sharing directly from each session card.
 - Full-screen session debugger with timeline and raw JSON preview.
 - External JSON viewer action for inspecting the exact shared file.
-
 
 ### Agent flow
 
