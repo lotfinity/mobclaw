@@ -23,9 +23,7 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.util.concurrent.TimeUnit
 
-/**
- * Generic OpenAI-compatible chat provider.
- */
+/** Generic OpenAI-compatible chat provider. */
 open class OpenAiCompatibleProvider(
     private val apiKey: String? = null,
     private val model: String,
@@ -117,21 +115,45 @@ open class OpenAiCompatibleProvider(
                 ModelInfo(
                     id = id,
                     name = id,
-                    supportsVision = id.contains("vision") || id.contains("gpt-4o") || id.contains("gemini"),
+                    supportsVision = id.contains("vision", ignoreCase = true) ||
+                        id.contains("omni", ignoreCase = true) ||
+                        id.contains("vl", ignoreCase = true) ||
+                        id.contains("gpt-4o", ignoreCase = true) ||
+                        id.contains("gemini", ignoreCase = true),
                     supportsTools = true,
                     description = "Owner: $ownedBy",
                 )
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             emptyList()
         }
     }
 
+    /**
+     * OpenAI-compatible multimodal message format. The base64 is placed in an
+     * image_url part, never inserted into the text prompt.
+     */
     private fun buildMessages(messages: List<ChatMessage>) = buildJsonArray {
         messages.forEach { msg ->
             add(buildJsonObject {
                 put("role", normalizeRole(msg.role))
-                put("content", msg.content)
+                val imageDataUrl = msg.imageDataUrl
+                if (imageDataUrl.isNullOrBlank()) {
+                    put("content", msg.content)
+                } else {
+                    put("content", buildJsonArray {
+                        add(buildJsonObject {
+                            put("type", "text")
+                            put("text", msg.content)
+                        })
+                        add(buildJsonObject {
+                            put("type", "image_url")
+                            put("image_url", buildJsonObject {
+                                put("url", imageDataUrl)
+                            })
+                        })
+                    })
+                }
             })
         }
     }
