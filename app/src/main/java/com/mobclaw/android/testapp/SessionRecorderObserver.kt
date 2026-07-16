@@ -265,11 +265,26 @@ class SessionRecorderObserver(
     }
 
     override fun onVerificationCompleted(passed: Boolean, notes: String) {
+        val observation = ScreenObservationStore.current
+        val screenshot = observation?.let(::persistObservationScreenshot)
+
         appendEvent(
             type = "verification_completed",
             data = buildJsonObject {
                 put("passed", passed)
                 put("notes", limited(notes))
+                observation?.let {
+                    put("snapshotId", it.snapshotId)
+                    put("packageName", it.packageName)
+                    put("screenshotWidth", it.width)
+                    put("screenshotHeight", it.height)
+                    put("screenshotAnnotated", true)
+                }
+                screenshot?.let {
+                    put("screenshotFile", it.name)
+                    put("screenshotMimeType", "image/jpeg")
+                    put("screenshotBytes", it.length())
+                }
             },
         )
     }
