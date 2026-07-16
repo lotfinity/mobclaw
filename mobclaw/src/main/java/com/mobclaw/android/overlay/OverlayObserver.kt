@@ -1,13 +1,12 @@
 package com.mobclaw.android.overlay
 
 import com.mobclaw.android.model.ForegroundInfo
+import com.mobclaw.android.model.ScreenObservationStore
 import com.mobclaw.android.model.ScreenState
 import com.mobclaw.android.observer.MobObserver
 import kotlin.time.Duration
 
-/**
- * MobObserver implementation that feeds real-time LLM actions to the AgentOverlay.
- */
+/** Feeds concise real-time agent activity to the floating overlay. */
 class OverlayObserver(private val overlay: AgentOverlay) : MobObserver {
 
     @Volatile
@@ -18,29 +17,30 @@ class OverlayObserver(private val overlay: AgentOverlay) : MobObserver {
     override fun onAgentStart(task: String) {
         overlay.show()
         overlay.clearActions()
-        overlay.updateStatus("Running: $task")
+        overlay.updateStatus("Running")
     }
 
     override fun onToolCall(toolName: String, duration: Duration, success: Boolean) {
-        if (toolName !in hiddenTools) {
-            overlay.markActionComplete(success)
-        }
+        if (toolName !in hiddenTools) overlay.markActionComplete(success)
     }
 
-    override fun onScreenRead(packageName: String, nodeCount: Int) {
-    }
+    override fun onScreenRead(packageName: String, nodeCount: Int) = Unit
 
     override fun onAgentEnd(task: String, duration: Duration, success: Boolean) {
         val status = if (success) "Done" else "Failed"
         overlay.updateStatus("$status (${duration.inWholeSeconds}s)")
+        overlay.hideAfter(if (success) 1800L else 4000L)
     }
 
     override fun onError(message: String, throwable: Throwable?) {
         overlay.updateStatus("Error: $message")
+        overlay.hideAfter(4000L)
     }
 
     override fun onReasoning(iteration: Int, text: String) {
-        overlay.showReasoning(text)
+        if (text.isNotBlank() && !text.equals("null", ignoreCase = true)) {
+            overlay.showReasoning(text)
+        }
     }
 
     override fun onActionPending(
@@ -49,8 +49,7 @@ class OverlayObserver(private val overlay: AgentOverlay) : MobObserver {
         arguments: Map<String, String>,
     ) {
         if (toolName in hiddenTools) return
-        val description = buildActionDescription(toolName, arguments)
-        overlay.showAction(toolName, description, isPending = true)
+        overlay.showAction(toolName, buildActionDescription(toolName, arguments), isPending = true)
     }
 
     override fun onScreenState(state: ScreenState) {
@@ -58,48 +57,45 @@ class OverlayObserver(private val overlay: AgentOverlay) : MobObserver {
     }
 
     override fun onForegroundChanged(foreground: ForegroundInfo) {
-        overlay.updateStatus("Foreground: ${foreground.packageName}")
+        overlay.updateStatus(foreground.packageName.substringAfterLast('.'))
     }
 
     override fun onStuckDetected(iteration: Int, consecutiveNoChange: Int) {
-        overlay.updateStatus("Stuck detected ($consecutiveNoChange unchanged)")
+        overlay.updateStatus("Trying another route")
     }
 
     private fun buildActionDescription(toolName: String, args: Map<String, String>): String {
+        val markerId = args["marker_id"]?.toIntOrNull()
+        val markerLabel = markerId?.let { id ->
+            ScreenObservationStore.current?.targets?.firstOrNull { it.markerId == id }?.label
+        }
         val nodeId = args["node_id"]
-        val resolvedText = nodeId?.let { resolveNodeText(it) }
+        val nodeLabel = nodeId?.let { resolveNodeText(it) }
 
         return when (toolName) {
-            "click", "long_click" -> {
-                if (nodeId != null) {
-                    val label = resolvedText ?: "?"
-                    "$nodeId \"$label\""
-                } else "?"
+            "click", "long_click" -> when {
+                markerId != null -> "#$markerId ${markerLabel.orEmpty()}".trim()
+                nodeId != null -> "$nodeId ${nodeLabel.orEmpty()}".trim()
+                else -> ""
             }
             "input_text" -> {
-                val text = args["text"] ?: ""
-                val label = resolvedText ?: nodeId ?: "?"
-                "$label <- \"$text\""
+                val target = markerLabel ?: nodeLabel ?: markerId?.let { "#$it" } ?: nodeId.orEmpty()
+                "$target <- ${args["text"].orEmpty()}".take(60)
             }
-            "tap" -> {
-                val x = args["x"] ?: "?"
-                val y = args["y"] ?: "?"
-                "($x, $y)"
-            }
-            "scroll" -> args["direction"] ?: "?"
-            "system_action" -> args["action"] ?: "?"
-            "open_app" -> args["package_name"]?.substringAfterLast('.') ?: "?"
+            "tap" -> "(${args["x"] ?: "?"}, ${args["y"] ?: "?"})"
+            "scroll" -> args["direction"] ?: ""
+            "system_action" -> args["action"] ?: ""
+            "open_app" -> args["package_name"]?.substringAfterLast('.') ?: ""
             "list_apps" -> args["filter"] ?: "all"
             "wait" -> "${args["milliseconds"] ?: "?"}ms"
-            "finish" -> args["reason"]?.take(40) ?: "done"
-            "fail" -> args["reason"]?.take(40) ?: "failed"
-            else -> args.entries.joinToString(", ") { "${it.key}=${it.value}" }.take(50)
+            "finish" -> args["result"]?.take(50) ?: args["reason"]?.take(50).orEmpty()
+            "fail" -> args["reason"]?.take(50).orEmpty()
+            else -> args.entries.joinToString(", ") { "${it.key}=${it.value}" }.take(60)
         }
     }
 
     private fun resolveNodeText(nodeId: String): String? {
-        val state = currentScreenState ?: return null
-        val node = state.nodes.find { it.id == nodeId } ?: return null
+        val node = currentScreenState?.nodes?.find { it.id == nodeId } ?: return null
         return node.text?.take(30)
             ?: node.contentDescription?.take(30)
             ?: node.resourceId?.substringAfterLast('/')?.take(30)
