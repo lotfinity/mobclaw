@@ -1,0 +1,20 @@
+# Gradle / Android build output
+.gradle/
+**/build/
+
+# Local Android SDK and API credentials
+local.properties
+*.jks
+*.keystore
+
+# IDE files
+.idea/
+*.iml
+
+# Native build output
+.externalNativeBuild/
+.cxx/
+
+# OS files
+.DS_Store
+Thumbs.db
