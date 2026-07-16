@@ -30,10 +30,15 @@ object VisualScreenReader {
     suspend fun capture(excludeSelf: Boolean = true): ScreenObservation? {
         val state = ScreenReader.read(excludeSelf = excludeSelf) ?: return null
         val service = MobClawAccessibilityService.instance ?: return null
-        val screenshot = service.captureCurrentWindowBitmap() ?: return null
+        val capture = service.captureCurrentWindowBitmap() ?: return null
+        val screenshot = capture.bitmap
 
-        val targets = buildTargets(state)
-        val annotated = renderMarkers(screenshot, state, targets)
+        val targets = buildTargets(state, capture.sourceBounds)
+        val annotated = renderMarkers(
+            source = screenshot,
+            sourceBounds = capture.sourceBounds,
+            targets = targets,
+        )
         if (annotated !== screenshot && !screenshot.isRecycled) screenshot.recycle()
 
         val imageDataUrl = try {
@@ -46,8 +51,8 @@ object VisualScreenReader {
             snapshotId = state.snapshotId,
             packageName = state.packageName,
             activityName = state.activityName,
-            width = state.displayWidth,
-            height = state.displayHeight,
+            width = capture.bitmap.width,
+            height = capture.bitmap.height,
             imageDataUrl = imageDataUrl,
             targets = targets,
             capturedAt = state.timestamp,
@@ -56,14 +61,13 @@ object VisualScreenReader {
         return observation
     }
 
-    private fun buildTargets(state: ScreenState): List<VisualTarget> {
-        val screenBounds = Rect(0, 0, state.displayWidth, state.displayHeight)
+    private fun buildTargets(state: ScreenState, sourceBounds: Rect): List<VisualTarget> {
         val candidates = state.nodes.filter { node ->
             node.isVisibleToUser &&
                 node.isEnabled &&
                 node.bounds.width() > 0 &&
                 node.bounds.height() > 0 &&
-                Rect.intersects(screenBounds, node.bounds) &&
+                Rect.intersects(sourceBounds, node.bounds) &&
                 (node.isClickable || node.isLongClickable || node.isEditable || node.isCheckable)
         }
 
@@ -87,7 +91,7 @@ object VisualScreenReader {
                     markerId = index + 1,
                     sourceNodeId = node.id,
                     bounds = Rect(node.bounds),
-                    label = labelFor(node),
+                    label = labelFor(node, state.nodes),
                     resourceId = node.resourceId,
                     className = node.className,
                     canClick = node.isClickable || node.isCheckable || node.isEditable,
@@ -111,14 +115,34 @@ object VisualScreenReader {
         return score
     }
 
-    private fun labelFor(node: ScreenNode): String? {
-        val raw = sequenceOf(
+    /**
+     * Prefer the target's own accessible name. Clickable list rows often keep
+     * their visible label on child TextViews, so infer a short label from text
+     * nodes geometrically contained inside the target bounds.
+     */
+    private fun labelFor(node: ScreenNode, allNodes: List<ScreenNode>): String? {
+        val own = sequenceOf(
             node.text,
             node.contentDescription,
             node.hintText,
             node.stateDescription,
-            node.resourceId?.substringAfterLast('/'),
         ).firstOrNull { !it.isNullOrBlank() }
+
+        val raw = own ?: allNodes.asSequence()
+            .filter { child ->
+                child.id != node.id &&
+                    child.isVisibleToUser &&
+                    node.bounds.contains(child.bounds) &&
+                    (!child.text.isNullOrBlank() || !child.contentDescription.isNullOrBlank())
+            }
+            .flatMap { child -> sequenceOf(child.text, child.contentDescription) }
+            .filterNotNull()
+            .filter { it.isNotBlank() }
+            .distinct()
+            .take(2)
+            .joinToString(" · ")
+            .ifBlank { null }
+            ?: node.resourceId?.substringAfterLast('/')
 
         return raw
             ?.replace(Regex("\\s+"), " ")
@@ -128,7 +152,7 @@ object VisualScreenReader {
 
     private fun renderMarkers(
         source: Bitmap,
-        state: ScreenState,
+        sourceBounds: Rect,
         targets: List<VisualTarget>,
     ): Bitmap {
         val mutable = source.copy(Bitmap.Config.ARGB_8888, true)
@@ -137,8 +161,8 @@ object VisualScreenReader {
             }
         val canvas = Canvas(mutable)
 
-        val scaleX = mutable.width.toFloat() / max(1, state.displayWidth)
-        val scaleY = mutable.height.toFloat() / max(1, state.displayHeight)
+        val scaleX = mutable.width.toFloat() / max(1, sourceBounds.width())
+        val scaleY = mutable.height.toFloat() / max(1, sourceBounds.height())
         val markerHeight = max(30f, mutable.width / 30f)
         val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
@@ -161,10 +185,9 @@ object VisualScreenReader {
             val textWidth = textPaint.measureText(number)
             val markerWidth = max(markerHeight, textWidth + markerHeight * 0.55f)
             val b = target.bounds
-            val left = b.left * scaleX
-            val top = b.top * scaleY
-            val right = b.right * scaleX
-            val bottom = b.bottom * scaleY
+            val left = (b.left - sourceBounds.left) * scaleX
+            val top = (b.top - sourceBounds.top) * scaleY
+            val bottom = (b.bottom - sourceBounds.top) * scaleY
 
             var markerLeft = left + 3f
             var markerTop = if (top >= markerHeight + 5f) top - markerHeight - 3f else top + 3f
