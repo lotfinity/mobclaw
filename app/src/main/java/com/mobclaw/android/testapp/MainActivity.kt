@@ -84,9 +84,13 @@ import com.mobclaw.android.observer.CompositeObserver
 import com.mobclaw.android.overlay.AgentOverlay
 import com.mobclaw.android.overlay.OverlayObserver
 import com.mobclaw.android.provider.*
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
+
+    @Volatile
+    private var activeAgent: MobAgent? = null
 
     private enum class Screen { Task, Sessions, Providers, Settings }
 
@@ -187,7 +191,7 @@ class MainActivity : ComponentActivity() {
         var apiKey by remember { mutableStateOf(BuildConfig.NVIDIA_API_KEY) }
         var task by remember { mutableStateOf("") }
         var isRunning by remember { mutableStateOf(false) }
-        var resultText by remember { mutableStateOf("Results will appear here...") }
+        var resultText by remember { mutableStateOf<String?>(null) }
         var providerMenuExpanded by remember { mutableStateOf(false) }
         var liteLlmModel by remember { mutableStateOf(nvidiaModels.first()) }
         var liteLlmModelMenuExpanded by remember { mutableStateOf(false) }
@@ -420,7 +424,10 @@ class MainActivity : ComponentActivity() {
 
             OutlinedTextField(
                 value = task,
-                onValueChange = { task = it },
+                onValueChange = {
+                    task = it
+                    if (!isRunning) resultText = null
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .heightIn(min = 80.dp),
@@ -455,7 +462,7 @@ class MainActivity : ComponentActivity() {
 
                         scope.launch {
                             isRunning = true
-                            resultText = "Executing..."
+                            resultText = null
                             try {
                                 val result = executeTask(
                                     mobMock = mobMock,
@@ -467,10 +474,17 @@ class MainActivity : ComponentActivity() {
                                     task = trimmedTask,
                                 )
                                 val status = if (result.success) "Success" else "Failed"
-                                resultText = buildString {
+                                val completedText = buildString {
                                     appendLine("$status (${result.iterations} iterations, ${result.duration.inWholeSeconds}s)")
                                     appendLine()
                                     append(result.message)
+                                }
+                                resultText = completedText
+                                if (result.success) {
+                                    scope.launch {
+                                        delay(6_000)
+                                        if (resultText == completedText) resultText = null
+                                    }
                                 }
                             } catch (e: Exception) {
                                 resultText = "Error: ${e.message}"
@@ -496,7 +510,7 @@ class MainActivity : ComponentActivity() {
 
                 if (isRunning) {
                     OutlinedButton(
-                        onClick = { },
+                        onClick = { activeAgent?.cancel() },
                         contentPadding = PaddingValues(vertical = 12.dp),
                     ) {
                         Text("Stop")
@@ -504,14 +518,16 @@ class MainActivity : ComponentActivity() {
                 }
             }
 
-            Text(
-                text = resultText,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 60.dp),
-                style = MaterialTheme.typography.bodySmall,
-                fontFamily = FontFamily.Monospace,
-            )
+            resultText?.let { message ->
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = message,
+                        modifier = Modifier.padding(12.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                    )
+                }
+            }
         }
     }
 
@@ -591,24 +607,35 @@ class MainActivity : ComponentActivity() {
                             onClick = { selectedSession = session },
                             modifier = Modifier.fillMaxWidth(),
                         ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-                                Text(
-                                    session.task.take(80),
-                                    style = MaterialTheme.typography.titleSmall,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    "${session.provider} | ${session.model ?: "default"} | ${session.events.size} events",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
-                                Text(
-                                    java.util.Date(session.startedAtEpochMs).toString(),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        session.task.take(80),
+                                        style = MaterialTheme.typography.titleSmall,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        "${session.provider} | ${session.model ?: "default"} | ${session.events.size} events",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    Text(
+                                        java.util.Date(session.startedAtEpochMs).toString(),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                IconButton(onClick = { shareRecordedSession(context, session) }) {
+                                    Icon(
+                                        Icons.Default.Share,
+                                        contentDescription = "Share this session",
+                                    )
+                                }
                             }
                         }
                     }
@@ -617,24 +644,9 @@ class MainActivity : ComponentActivity() {
         }
 
         selectedSession?.let { session ->
-            AlertDialog(
-                onDismissRequest = { selectedSession = null },
-                title = { Text("Session ${session.sessionId.take(8)}") },
-                text = {
-                    Column {
-                        Text("Task: ${session.task}", style = MaterialTheme.typography.bodyMedium)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text("Provider: ${session.provider}", style = MaterialTheme.typography.bodySmall)
-                        Text("Model: ${session.model ?: "default"}", style = MaterialTheme.typography.bodySmall)
-                        Text("Events: ${session.events.size}", style = MaterialTheme.typography.bodySmall)
-                        Text("Success: ${session.success ?: "unknown"}", style = MaterialTheme.typography.bodySmall)
-                    }
-                },
-                confirmButton = {
-                    TextButton(onClick = { selectedSession = null }) {
-                        Text("Close")
-                    }
-                },
+            SessionPreviewDialog(
+                session = session,
+                onDismiss = { selectedSession = null },
             )
         }
     }
@@ -683,8 +695,8 @@ class MainActivity : ComponentActivity() {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text("Agent Configuration", style = MaterialTheme.typography.titleSmall)
                     Spacer(modifier = Modifier.height(4.dp))
-                    Text("Max iterations: 120", style = MaterialTheme.typography.bodySmall)
-                    Text("Stability wait: 500ms", style = MaterialTheme.typography.bodySmall)
+                    Text("Max iterations: 60", style = MaterialTheme.typography.bodySmall)
+                    Text("Temperature: 0.2 · Stability wait: 500ms", style = MaterialTheme.typography.bodySmall)
                     Text("Max stuck count: 3", style = MaterialTheme.typography.bodySmall)
                     Text("Verify on finish: enabled", style = MaterialTheme.typography.bodySmall)
                     Text("Max actions per turn: 1", style = MaterialTheme.typography.bodySmall)
@@ -762,7 +774,12 @@ class MainActivity : ComponentActivity() {
             agentOverlay.updateStatus("Stopping...")
         }
 
-        return agent.execute(task)
+        activeAgent = agent
+        return try {
+            agent.execute(task)
+        } finally {
+            activeAgent = null
+        }
     }
 
     private fun buildProvider(

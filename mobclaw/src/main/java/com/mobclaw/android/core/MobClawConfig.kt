@@ -5,10 +5,10 @@ package com.mobclaw.android.core
  */
 data class MobClawConfig(
     /** Maximum tool call iterations per task before stopping. */
-    val maxIterations: Int = 120,
+    val maxIterations: Int = 60,
 
-    /** Default temperature for LLM calls. */
-    val temperature: Double = 0.7,
+    /** Low sampling temperature keeps GUI actions deterministic. */
+    val temperature: Double = 0.2,
 
     /** Model name for the LLM provider. */
     val model: String? = null,
@@ -37,6 +37,6 @@ data class MobClawConfig(
     /** Delay (ms) before post-completion verification snapshot. */
     val verificationDelayMs: Long = 1000,
 
-    /** Maximum number of actions allowed per single observation turn. */
+    /** Exactly one action is executed for each visual observation. */
     val maxActionsPerTurn: Int = 1,
 )

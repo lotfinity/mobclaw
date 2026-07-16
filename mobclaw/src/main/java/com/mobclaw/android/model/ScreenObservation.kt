@@ -48,16 +48,24 @@ data class ScreenObservation(
 ) {
     fun toPromptText(): String = buildString {
         appendLine("## Visual Screen Observation")
-        appendLine("Snapshot: #$snapshotId")
+        appendLine("ACTION_SNAPSHOT_ID: $snapshotId")
         appendLine("Package: $packageName")
         activityName?.let { appendLine("Activity: $it") }
-        appendLine("Image: attached annotated full-screen screenshot (${width}x${height})")
+        appendLine("Image: attached annotated Android screenshot (${width}x${height})")
         appendLine("Numbered targets: ${targets.size}")
+        appendLine("Allowed marker IDs: ${targets.joinToString(", ") { it.markerId.toString() }.ifBlank { "NONE" }}")
         appendLine()
-        appendLine("Use the number printed on the screenshot with marker_id and this snapshot_id.")
-        appendLine("Visible text, icons, layout, dialogs, and unmarked information must be read directly from the screenshot.")
-        appendLine()
+        appendLine("Copy ACTION_SNAPSHOT_ID exactly into snapshot_id. Never shorten, guess, or reuse it.")
+        appendLine("Only marker IDs listed above exist. Read all visible text and layout directly from the screenshot.")
 
+        if (targets.isEmpty()) {
+            appendLine("NO MARKERS: do not call click, long_click, or input_text with an invented marker.")
+            if (packageName == "com.mobclaw.android.testapp" || packageName == "com.mobclaw.android") {
+                appendLine("This is the MobClaw host screen. Use open_app immediately for a known destination, or list_apps if its package is unknown.")
+            }
+        }
+
+        if (targets.isNotEmpty()) appendLine()
         targets.forEach { target ->
             append("[${target.markerId}] ${target.actionSummary().ifBlank { "target" }}")
             target.label?.takeIf { it.isNotBlank() }?.let { append(" — $it") }

@@ -6,12 +6,12 @@ import kotlinx.serialization.json.*
 
 /**
  * Dispatcher that parses JSON tool calls from LLM responses.
- * Supports both native function calling and XML-style fallback.
+ * Supports native function calling and XML-style fallback.
  */
 class JsonActionDispatcher : ActionDispatcher {
 
     override fun parseResponse(response: ChatResponse): Pair<String, List<MobAction>> {
-        val text = response.textOrEmpty()
+        val text = response.textOrEmpty().cleanAssistantText()
 
         if (response.hasToolCalls()) {
             val actions = response.toolCalls.map { tc ->
@@ -59,7 +59,7 @@ class JsonActionDispatcher : ActionDispatcher {
         val after = remaining.trim()
         if (after.isNotEmpty()) textParts.add(after)
 
-        return Pair(textParts.joinToString("\n"), calls)
+        return Pair(textParts.joinToString("\n").cleanAssistantText(), calls)
     }
 
     override fun formatResults(results: List<ToolExecutionResult>): ConversationMessage {
@@ -73,41 +73,29 @@ class JsonActionDispatcher : ActionDispatcher {
     }
 
     override fun promptInstructions(tools: List<MobTool>): String = buildString {
-        appendLine("## Visual Screen Control")
+        appendLine("## Tool protocol")
+        appendLine("Use exactly ONE tool call per turn. MobClaw automatically captures a fresh screen after each action.")
+        appendLine("For native tool calling, call the function directly. For text fallback, use:")
+        appendLine("<tool_call>{\"name\":\"tool_name\",\"arguments\":{}}</tool_call>")
         appendLine()
-        appendLine("The latest screen observation includes an attached FULL Android screenshot.")
-        appendLine("Numbered boxes are synthetic action markers. Read all original text, icons, dialogs, spatial relationships, and unmarked values directly from the image.")
-        appendLine("For a numbered target, call click/long_click/input_text with BOTH snapshot_id and marker_id.")
-        appendLine("Marker numbers are valid only for the snapshot in the same observation. Never reuse a marker after the screen changes.")
-        appendLine("Use node_id only when the observation explicitly says the visual screenshot is unavailable and provides a text-tree fallback.")
-        appendLine("Use tap(x,y) for a visually apparent target that has no marker, such as Canvas, map, game, or inaccessible WebView content.")
-        appendLine()
-        appendLine("## Tool Use Protocol")
-        appendLine()
-        appendLine("To use a tool, wrap a JSON object in <tool_call></tool_call> tags:")
-        appendLine()
-        appendLine("<tool_call>")
-        appendLine("""{"name": "tool_name", "arguments": {"param": "value"}}""")
-        appendLine("</tool_call>")
-        appendLine()
-        appendLine("You may use multiple tool calls in a single response.")
-        appendLine("After tool execution, results appear in <tool_result> tags.")
-        appendLine("Continue reasoning with the results until the task is complete.")
-        appendLine()
-        appendLine("### Available Tools")
-        appendLine()
-        for (tool in tools) {
-            appendLine("- **${tool.name}**: ${tool.description}")
-            appendLine("  Parameters: `${tool.parametersSchema()}`")
+        appendLine("### Available tools")
+        tools.forEach { tool ->
+            appendLine("- ${tool.name}: ${tool.description}")
+            appendLine("  schema: ${tool.parametersSchema()}")
         }
     }
 
     override fun toProviderMessages(history: List<ConversationMessage>): List<ChatMessage> {
         val messages = history.flatMap { msg ->
             when (msg) {
-                is ConversationMessage.Chat -> listOf(msg.message)
+                is ConversationMessage.Chat -> {
+                    val cleaned = msg.message.content.cleanAssistantText()
+                    if (cleaned.isBlank() && msg.message.role == "assistant") emptyList()
+                    else listOf(msg.message.copy(content = cleaned))
+                }
                 is ConversationMessage.AssistantToolCalls -> {
-                    listOf(ChatMessage.assistant(msg.text.orEmpty()))
+                    val cleaned = msg.text.orEmpty().cleanAssistantText()
+                    if (cleaned.isBlank()) emptyList() else listOf(ChatMessage.assistant(cleaned))
                 }
                 is ConversationMessage.ToolResults -> {
                     val content = msg.results.joinToString("\n") { result ->
@@ -118,10 +106,9 @@ class JsonActionDispatcher : ActionDispatcher {
             }
         }.toMutableList()
 
-        // Attach only the newest screenshot. Previous observations remain cheap
-        // text summaries, so request size does not grow by one image per turn.
+        // Attach only the newest screenshot. Earlier observations stay text-only.
         val observation = ScreenObservationStore.current ?: return messages
-        val marker = "Snapshot: #${observation.snapshotId}"
+        val marker = "ACTION_SNAPSHOT_ID: ${observation.snapshotId}"
         val index = messages.indexOfLast { message ->
             message.role == "user" && message.content.contains(marker)
         }
@@ -132,5 +119,10 @@ class JsonActionDispatcher : ActionDispatcher {
         return messages
     }
 
-    override fun shouldSendToolSpecs(): Boolean = false
+    override fun shouldSendToolSpecs(): Boolean = true
+
+    private fun String.cleanAssistantText(): String {
+        val cleaned = trim()
+        return if (cleaned.equals("null", ignoreCase = true)) "" else cleaned
+    }
 }

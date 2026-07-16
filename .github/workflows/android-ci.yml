@@ -6,6 +6,7 @@ on:
     branches:
       - main
       - feature/visual-screen-observation
+      - release/v1.0.1-polish
 
 permissions:
   contents: read
@@ -16,6 +17,9 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Check out MobMock sibling module
+        run: git clone --depth 1 https://github.com/wamynobe/mobmock.git ../mobmock
 
       - name: Set up Java 17
         uses: actions/setup-java@v4
@@ -29,15 +33,15 @@ jobs:
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
 
-      - name: Compile MobClaw library
+      - name: Compile MobClaw and test app
         id: compile
         shell: bash
         run: |
           set +e
-          ./gradlew :mobclaw:compileDebugKotlin --console=plain > compile.log 2>&1
+          ./gradlew :mobclaw:compileDebugKotlin :app:compileDebugKotlin --console=plain > compile.log 2>&1
           status=$?
           echo "status=$status" >> "$GITHUB_OUTPUT"
-          tail -n 120 compile.log
+          tail -n 160 compile.log
           exit 0
 
       - name: Upload compiler log

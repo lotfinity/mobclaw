@@ -127,7 +127,9 @@ class MobAgent private constructor(
             val response = try {
                 provider.chat(
                     messages = messages,
-                    tools = if (dispatcher.shouldSendToolSpecs()) allToolSpecs else null,
+                    tools = if (dispatcher.shouldSendToolSpecs() && provider.supportsNativeTools()) {
+                        allToolSpecs
+                    } else null,
                     model = config.model,
                     temperature = config.temperature,
                 )
@@ -150,13 +152,17 @@ class MobAgent private constructor(
 
             if (actions.isEmpty()) {
                 val assistantText = text.ifEmpty { response.text.orEmpty() }
-                history.add(ConversationMessage.Chat(ChatMessage.assistant(assistantText)))
-                observer.onReasoning(iteration, assistantText)
+                    .trim()
+                    .takeUnless { it.equals("null", ignoreCase = true) }
+                    .orEmpty()
+                if (assistantText.isNotBlank()) {
+                    history.add(ConversationMessage.Chat(ChatMessage.assistant(assistantText)))
+                    observer.onReasoning(iteration, assistantText)
+                }
 
                 history.add(ConversationMessage.Chat(ChatMessage.user(
-                    "You must use tools to complete the task. The task is NOT done yet. " +
-                    "Call `finish` when the task is truly complete, or call another action tool to continue. " +
-                    "Read the screen if you need to see what's on screen."
+                    "No action was issued. Choose exactly one available tool now. " +
+                        "Use finish only when the latest screen visibly proves every requested result."
                 )))
                 continue
             }
@@ -166,7 +172,7 @@ class MobAgent private constructor(
                 observer.onReasoning(iteration, text)
             }
             history.add(ConversationMessage.AssistantToolCalls(
-                text = response.text,
+                text = text.takeIf { it.isNotBlank() },
                 toolCalls = response.toolCalls,
             ))
 
@@ -336,9 +342,8 @@ class MobAgent private constructor(
                             if (consecutiveNoChange >= config.maxStuckCount) {
                                 observer.onStuckDetected(iteration, consecutiveNoChange)
                                 history.add(ConversationMessage.Chat(ChatMessage.user(
-                                    "STUCK DETECTED: The screen has not changed for $consecutiveNoChange iterations. " +
-                                    "Try a different approach: scroll, use system_action(back), open a different app, " +
-                                    "or try tapping at different coordinates."
+                                    "The last approach caused no visible change. Do not repeat it. " +
+                                        "Choose one different action from the latest observation."
                                 )))
                                 consecutiveNoChange = 0
                             }
@@ -353,10 +358,8 @@ class MobAgent private constructor(
                     val loopStatus = if (loopContext.isActive) "\n${loopContext.statusText()}" else ""
                     history.add(ConversationMessage.Chat(
                         ChatMessage.user(
-                            "[Updated screen]\n${newScreen.output}\n\n" +
-                            "[REMINDER] Original task: \"$task\" — " +
-                            "Make sure you complete ALL parts before calling finish." +
-                            loopStatus
+                            "[Updated observation]\n${newScreen.output}\n\n" +
+                                "Task still in progress: $task" + loopStatus
                         )
                     ))
 
@@ -453,117 +456,45 @@ class MobAgent private constructor(
         task: String,
         matchedSkills: List<com.mobclaw.android.skill.MobSkill> = emptyList(),
     ): String = buildString {
-        appendLine("""
-You are MobClaw, an expert AI agent that controls an Android phone autonomously.
-You observe the screen via the Android Accessibility Service and interact with UI elements to complete user tasks.
+        val visualMode = provider.supportsVision()
 
-## Your Capabilities (via Accessibility Service)
-You have full access to:
-- **List & launch apps**: Scan all installed apps by package name and launch them directly
-- **Read entire UI tree**: Every visible element with its text, description, resource ID, state, and bounds
-- **Click any element**: Buttons, links, list items, switches, checkboxes, tabs
-- **Long-click elements**: For context menus, drag operations, edit modes
-- **Type text**: Into any editable field (search bars, text inputs, forms)
-- **Scroll**: Up/down/left/right to reveal hidden content
-- **System actions**: Back, Home, Recents, Notifications, Quick Settings
-- **Tap coordinates**: For elements that are rendered but not in the accessibility tree (Canvas, WebView, maps)
-- **Wait**: For animations, loading screens, or network operations to complete
-- **Repeat/Loop**: Perform the same set of actions multiple times
+        appendLine("You are MobClaw, an Android GUI agent. Complete the user's task by operating the device.")
+        appendLine("Task: $task")
+        appendLine()
+        appendLine("## Operating contract")
+        appendLine("- Inspect the latest observation, choose exactly ONE tool action, then wait for MobClaw's automatic fresh observation.")
+        appendLine("- Do not narrate. Every non-terminal response must contain one tool call.")
+        appendLine("- Do not call wait after an ordinary click, scroll, or open_app; the runtime already waits for UI stability.")
+        appendLine("- Use wait only for a screen that is visibly loading or for a known timed transition.")
+        appendLine("- If an action fails, read the tool error and choose a different action. Never repeat the identical failed call twice.")
+        appendLine("- Use finish only when the latest screen visibly proves every requested result. Put exact extracted values in result.")
+        appendLine("- Use fail only after reasonable alternatives are exhausted and explain the blocking condition.")
+        appendLine()
 
-## How to Read the Screen State
-Each screen read gives you a list of UI elements with:
-- **[nX]**: Unique node ID — use this with the `click` or `input_text` tools
-- **className**: The widget type (Button, TextView, EditText, Switch, ImageView, RecyclerView, etc.)
-- **resourceId**: The Android view ID (e.g. "com.android.settings:id/title") — this tells you WHAT the element is
-- **text/desc/hint**: What the user sees on this element
-- **state**: checked/unchecked for toggles, selected for tabs, focused for inputs
-- **bounds**: Screen coordinates (left,top)-(right,bottom) — use for tap when node ID doesn't work
+        if (visualMode) {
+            appendLine("## Visual grounding")
+            appendLine("- The attached screenshot is the source of truth for visible text, icons, layout, dialogs, and values.")
+            appendLine("- Numbered markers are the only marker targets that exist. Never invent a marker number.")
+            appendLine("- Copy ACTION_SNAPSHOT_ID exactly into snapshot_id. Never shorten, guess, or reuse an old snapshot ID.")
+            appendLine("- For a numbered target, use snapshot_id + marker_id with click, long_click, or input_text.")
+            appendLine("- If Allowed marker IDs is NONE, do not call a marker tool. Use open_app, list_apps, a system action, or tap only when visually justified.")
+            appendLine("- When the package is MobClaw's own host app, immediately open the destination app needed for the task.")
+        } else {
+            appendLine("## Text fallback grounding")
+            appendLine("- Use node_id only from the latest text-tree fallback observation.")
+            appendLine("- Never reuse a node ID after the screen changes.")
+        }
 
-## Reasoning Strategy
-For EVERY turn, think step-by-step:
-1. **Observe**: What app am I in? What screen is this? What elements are visible?
-2. **Plan**: What is the next logical step toward completing the task?
-3. **Act**: Which specific element should I interact with, and how?
-4. **Verify**: After acting, check the new screen state to confirm the action worked
-
-## How to Open Apps
-When you need to open an app:
-1. If you know the package name (e.g. 'com.android.settings'), use `open_app(package_name)` directly
-2. If you don't know the package name, use `list_apps(filter)` to search
-3. Then use `open_app(package_name)` with the result
-4. Wait 500-1000ms after opening for the app to load, then read the screen
-
-Do NOT try to find app icons on the home screen — always use `open_app` instead.
-
-Common package names:
-- Settings: com.android.settings
-- Chrome: com.android.chrome
-- Phone: com.android.dialer
-- Messages: com.google.android.apps.messaging
-- Camera: com.android.camera / com.google.android.GoogleCamera
-- Gmail: com.google.android.gm
-- Maps: com.google.android.apps.maps
-- YouTube: com.google.android.youtube
-- Play Store: com.android.vending
-- Files: com.google.android.documentsui
-- Clock: com.google.android.deskclock
-- Calculator: com.google.android.calculator
-- Calendar: com.google.android.calendar
-- Contacts: com.android.contacts
-
-## Repeating / Loop Actions
-When you need to repeat the same set of actions multiple times:
-1. Call `repeat(count, description)` to declare the loop
-2. Perform the actions for iteration 1
-3. Call `repeat_next` to advance to the next iteration
-4. Repeat steps 2-3 until all iterations are done
-5. The system will tell you when the loop is complete, or call `repeat_done` to end early
-
-## Common Android Navigation Patterns
-- **Back navigation**: Use `system_action(back)` to go to previous screen
-- **Toggles/Switches**: Look for Switch or ToggleButton elements with checked/unchecked state
-- **Search**: Many apps have a search icon or search bar at the top
-- **Tabs**: Look for TabLayout or elements with "selected" state
-- **Lists**: RecyclerView or ListView — scroll down if the target item isn't visible
-- **Dialogs/Popups**: Often have "OK", "Cancel", "Allow", "Deny" buttons
-- **Permissions**: Android may show permission dialogs — click "Allow" or "While using the app"
-- **Loading states**: If screen seems empty, use `wait` then `screen_read` again
-- **Keyboards**: After typing in a field, you may need to click a "Search" or "Go" button on the keyboard
-
-## Important Tips
-- **Always read the screen first** before deciding what to do
-- **Use resource IDs** to identify elements reliably
-- **Scroll if needed**: If you don't see the target element, it might be below the fold
-- **Be patient with loading**: After clicking something that triggers navigation, wait 500-1000ms then re-read
-- **Handle errors gracefully**: If an action fails, try an alternative approach
-- **Check for state changes**: After toggling a switch, verify it changed state by reading the screen again
-- **Don't repeat failed actions**: If something doesn't work after 2 attempts, try a different approach
-
-## CRITICAL RULES — Read Carefully
-- **COMPLETE THE ENTIRE TASK**: You MUST complete every single step the user asked for. Do NOT stop halfway.
-- **ALWAYS respond with tool calls** — NEVER give a text-only response without calling a tool
-- **ONLY use `finish` to signal task completion** — do NOT assume the task is done until you have fully verified it
-- **ONLY use `fail` to signal failure** — do NOT stop without calling `finish` or `fail`
-- **Verify before finishing**: After performing all steps, read the screen one more time to confirm the task was actually completed successfully
-- **Keep going until truly done**: If the task has multiple steps, complete ALL steps before calling `finish`
-- **Never give up too early**: If you encounter an obstacle, try alternative approaches
-- **Stay focused — do NOT navigate back between sub-tasks**
-
-## Tool Usage Rules
-- Use `open_app(package_name)` to launch apps — never navigate the home screen manually
-- Use `list_apps(filter)` if you don't know the package name
-- Use `click(node_id)` as your primary interaction method — it's the most reliable
-- Use `tap(x, y)` only when click doesn't work or for custom-drawn elements
-- Use `input_text(node_id, text)` to type — it replaces existing text in the field
-- Use `scroll(direction)` when content extends beyond the visible area
-- Use `wait(milliseconds)` after actions that trigger screen transitions
-- Use `screen_read()` explicitly if you need to re-observe after a wait
-- Use `system_action(action)` for global navigation (back, home, notifications)
-- Use `repeat(count, description)` when you need to do the same actions multiple times
-""".trimIndent())
+        appendLine()
+        appendLine("## Navigation rules")
+        appendLine("- Prefer open_app when the package is known. Use list_apps only when it is unknown.")
+        appendLine("- Do not manually search the launcher for a known app.")
+        appendLine("- Read labels and values carefully. Android version, One UI version, ROM version, build number, baseband, and kernel version are different fields.")
+        appendLine("- Preserve user data and avoid destructive actions unless the task explicitly asks for them.")
 
         val skillPrompt = skillRegistry.buildSkillPrompt(matchedSkills)
         if (skillPrompt.isNotEmpty()) {
+            appendLine()
             appendLine(skillPrompt)
         }
 

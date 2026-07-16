@@ -186,13 +186,14 @@ open class OpenAiCompatibleProvider(
 
     private fun parseMessageText(message: JsonObject): String? {
         val content = message["content"] ?: return null
-        return when (content) {
+        val parsed = when (content) {
             is JsonPrimitive -> content.asStringOrNull()
             is JsonArray -> content.joinToString("\n") { part ->
                 part.jsonObject["text"].asStringOrNull().orEmpty()
             }.ifBlank { null }
             else -> null
         }
+        return parsed?.trim()?.takeUnless { it.equals("null", ignoreCase = true) || it.isBlank() }
     }
 
     private fun parseToolCalls(message: JsonObject): List<ToolCall> {
