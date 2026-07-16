@@ -7,6 +7,10 @@ on:
     paths:
       - scripts/apply_v101_polish.py
       - .github/workflows/apply-v101-polish.yml
+  pull_request:
+    branches:
+      - feature/visual-screen-observation
+    types: [opened, reopened, synchronize]
 
 permissions:
   contents: write
