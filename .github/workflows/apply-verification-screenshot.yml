@@ -1,0 +1,34 @@
+name: Apply verification screenshot patch
+
+on:
+  push:
+    branches:
+      - feature/session-observation-screenshots
+    paths:
+      - scripts/apply_verification_screenshot.py
+      - .github/workflows/apply-verification-screenshot.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/session-observation-screenshots
+          fetch-depth: 0
+
+      - name: Apply patch
+        run: python3 scripts/apply_verification_screenshot.py
+
+      - name: Commit generated changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: attach screenshot to verification event"
+          git push origin HEAD:feature/session-observation-screenshots
