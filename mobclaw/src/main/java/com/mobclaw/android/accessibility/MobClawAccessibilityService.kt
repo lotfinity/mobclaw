@@ -3,12 +3,19 @@ package com.mobclaw.android.accessibility
 import android.accessibilityservice.AccessibilityService
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
+import android.graphics.Rect
 import android.os.Build
 import android.view.Display
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlin.coroutines.resume
+
+/** Bitmap plus the screen-coordinate rectangle represented by that bitmap. */
+data class CapturedScreenshot(
+    val bitmap: Bitmap,
+    val sourceBounds: Rect,
+)
 
 /**
  * Central AccessibilityService for MobClaw.
@@ -36,16 +43,26 @@ class MobClawAccessibilityService : AccessibilityService() {
      * 11-13 fall back to a full default-display screenshot.
      */
     @SuppressLint("NewApi")
-    suspend fun captureCurrentWindowBitmap(): Bitmap? {
+    suspend fun captureCurrentWindowBitmap(): CapturedScreenshot? {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return null
 
+        val displayMetrics = resources.displayMetrics
+        val displayBounds = Rect(0, 0, displayMetrics.widthPixels, displayMetrics.heightPixels)
         val root = getRootNode()
         val windowId = root?.windowId
+        val windowBounds = Rect()
+        root?.getBoundsInScreen(windowBounds)
         root?.recycle()
 
+        val useWindowCapture = Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
+            windowId != null &&
+            windowBounds.width() > 0 &&
+            windowBounds.height() > 0
+        val capturedBounds = if (useWindowCapture) Rect(windowBounds) else displayBounds
+
         return suspendCancellableCoroutine { continuation ->
-            val callback = object : TakeScreenshotCallback {
-                override fun onSuccess(screenshot: ScreenshotResult) {
+            val callback = object : AccessibilityService.TakeScreenshotCallback {
+                override fun onSuccess(screenshot: AccessibilityService.ScreenshotResult) {
                     val hardwareBuffer = screenshot.hardwareBuffer
                     val bitmap = try {
                         Bitmap.wrapHardwareBuffer(hardwareBuffer, screenshot.colorSpace)
@@ -56,7 +73,9 @@ class MobClawAccessibilityService : AccessibilityService() {
                         hardwareBuffer.close()
                     }
 
-                    if (continuation.isActive) continuation.resume(bitmap)
+                    if (continuation.isActive) {
+                        continuation.resume(bitmap?.let { CapturedScreenshot(it, capturedBounds) })
+                    }
                 }
 
                 override fun onFailure(errorCode: Int) {
@@ -65,8 +84,8 @@ class MobClawAccessibilityService : AccessibilityService() {
             }
 
             try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE && windowId != null) {
-                    takeScreenshotOfWindow(windowId, mainExecutor, callback)
+                if (useWindowCapture) {
+                    takeScreenshotOfWindow(windowId!!, mainExecutor, callback)
                 } else {
                     takeScreenshot(Display.DEFAULT_DISPLAY, mainExecutor, callback)
                 }
