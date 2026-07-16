@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.mobclaw.android.core.MobAgentTest" tests="7" skipped="0" failures="0" errors="0" timestamp="2026-07-16T06:40:57" hostname="inspiron-gnmd" time="0.164">
+  <properties/>
+  <testcase name="execute_returnsSuccessOnFinish" classname="com.mobclaw.android.core.MobAgentTest" time="0.15"/>
+  <testcase name="execute_withFailToolReturnsFailureResult" classname="com.mobclaw.android.core.MobAgentTest" time="0.002"/>
+  <testcase name="execute_providesTraceOnSuccess" classname="com.mobclaw.android.core.MobAgentTest" time="0.001"/>
+  <testcase name="execute_withoutActionsLoopsUntilIterationLimit" classname="com.mobclaw.android.core.MobAgentTest" time="0.003"/>
+  <testcase name="execute_withProviderErrorReturnsFailure" classname="com.mobclaw.android.core.MobAgentTest" time="0.001"/>
+  <testcase name="execute_withCancelStopsOnNextIteration" classname="com.mobclaw.android.core.MobAgentTest" time="0.002"/>
+  <testcase name="execute_maxActionsPerTurn_limitsActions" classname="com.mobclaw.android.core.MobAgentTest" time="0.003"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

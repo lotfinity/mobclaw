@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.mobclaw.android.memory.InMemoryStorageTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2026-07-16T06:40:57" hostname="inspiron-gnmd" time="0.004">
+  <properties/>
+  <testcase name="clear_removesAllEntries" classname="com.mobclaw.android.memory.InMemoryStorageTest" time="0.002"/>
+  <testcase name="store_replacesExistingKeyAndReturnsLatestForMatchingQuery" classname="com.mobclaw.android.memory.InMemoryStorageTest" time="0.001"/>
+  <testcase name="recall_isCaseInsensitiveAndRespectsLimit" classname="com.mobclaw.android.memory.InMemoryStorageTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

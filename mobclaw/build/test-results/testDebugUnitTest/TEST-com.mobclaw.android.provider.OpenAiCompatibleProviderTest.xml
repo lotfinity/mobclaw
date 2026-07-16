@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.mobclaw.android.provider.OpenAiCompatibleProviderTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-07-16T06:40:58" hostname="inspiron-gnmd" time="0.019">
+  <properties/>
+  <testcase name="chat_parsesArrayMessageContentAsJoinedText" classname="com.mobclaw.android.provider.OpenAiCompatibleProviderTest" time="0.011"/>
+  <testcase name="chat_buildsRequestAndParsesTextAndToolCalls" classname="com.mobclaw.android.provider.OpenAiCompatibleProviderTest" time="0.008"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

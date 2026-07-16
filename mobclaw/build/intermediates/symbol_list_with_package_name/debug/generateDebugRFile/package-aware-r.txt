@@ -1,0 +1,3 @@
+com.mobclaw.android
+string mobclaw_accessibility_description
+xml accessibility_service_config

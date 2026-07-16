@@ -1,0 +1,60 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    xmlns:tools="http://schemas.android.com/tools"
+4    package="com.mobclaw.android" >
+5
+6    <uses-sdk android:minSdkVersion="26" />
+7
+8    <uses-permission android:name="android.permission.INTERNET" />
+8-->/home/lofa/mobclaw/mobclaw/src/main/AndroidManifest.xml:4:5-67
+8-->/home/lofa/mobclaw/mobclaw/src/main/AndroidManifest.xml:4:22-64
+9    <!-- Required on Android 11+ (API 30) to query/list all installed packages -->
+10    <uses-permission
+10-->/home/lofa/mobclaw/mobclaw/src/main/AndroidManifest.xml:6:5-7:53
+11        android:name="android.permission.QUERY_ALL_PACKAGES"
+11-->/home/lofa/mobclaw/mobclaw/src/main/AndroidManifest.xml:6:22-74
+12        tools:ignore="QueryAllPackagesPermission" />
+12-->/home/lofa/mobclaw/mobclaw/src/main/AndroidManifest.xml:7:9-50
+13
+14    <!-- Fallback: declare intents we query so apps are visible even without QUERY_ALL_PACKAGES -->
+15    <queries>
+15-->/home/lofa/mobclaw/mobclaw/src/main/AndroidManifest.xml:10:5-15:15
+16        <intent>
+16-->/home/lofa/mobclaw/mobclaw/src/main/AndroidManifest.xml:11:9-14:18
+17            <action android:name="android.intent.action.MAIN" />
+17-->/home/lofa/mobclaw/mobclaw/src/main/AndroidManifest.xml:12:13-65
+17-->/home/lofa/mobclaw/mobclaw/src/main/AndroidManifest.xml:12:21-62
+18
+19            <category android:name="android.intent.category.LAUNCHER" />
+19-->/home/lofa/mobclaw/mobclaw/src/main/AndroidManifest.xml:13:13-73
+19-->/home/lofa/mobclaw/mobclaw/src/main/AndroidManifest.xml:13:23-70
+20        </intent>
+21    </queries>
+22
+23    <application>
+23-->/home/lofa/mobclaw/mobclaw/src/main/AndroidManifest.xml:16:5-28:19
+24        <service
+24-->/home/lofa/mobclaw/mobclaw/src/main/AndroidManifest.xml:17:9-27:19
+25            android:name="com.mobclaw.android.accessibility.MobClawAccessibilityService"
+25-->/home/lofa/mobclaw/mobclaw/src/main/AndroidManifest.xml:18:13-70
+26            android:exported="true"
+26-->/home/lofa/mobclaw/mobclaw/src/main/AndroidManifest.xml:19:13-36
+27            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE" >
+27-->/home/lofa/mobclaw/mobclaw/src/main/AndroidManifest.xml:20:13-79
+28            <intent-filter>
+28-->/home/lofa/mobclaw/mobclaw/src/main/AndroidManifest.xml:21:13-23:29
+29                <action android:name="android.accessibilityservice.AccessibilityService" />
+29-->/home/lofa/mobclaw/mobclaw/src/main/AndroidManifest.xml:22:17-92
+29-->/home/lofa/mobclaw/mobclaw/src/main/AndroidManifest.xml:22:25-89
+30            </intent-filter>
+31
+32            <meta-data
+32-->/home/lofa/mobclaw/mobclaw/src/main/AndroidManifest.xml:24:13-26:72
+33                android:name="android.accessibilityservice"
+33-->/home/lofa/mobclaw/mobclaw/src/main/AndroidManifest.xml:25:17-60
+34                android:resource="@xml/accessibility_service_config" />
+34-->/home/lofa/mobclaw/mobclaw/src/main/AndroidManifest.xml:26:17-69
+35        </service>
+36    </application>
+37
+38</manifest>

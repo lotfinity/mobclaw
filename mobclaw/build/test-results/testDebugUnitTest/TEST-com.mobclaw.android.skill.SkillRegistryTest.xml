@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.mobclaw.android.skill.SkillRegistryTest" tests="9" skipped="0" failures="0" errors="0" timestamp="2026-07-16T06:40:58" hostname="inspiron-gnmd" time="0.004">
+  <properties/>
+  <testcase name="findMatchingSkills_noMatch" classname="com.mobclaw.android.skill.SkillRegistryTest" time="0.001"/>
+  <testcase name="findMatchingSkills_matchesMessengerKeyword" classname="com.mobclaw.android.skill.SkillRegistryTest" time="0.0"/>
+  <testcase name="buildSkillPrompt_returnsEmptyForNoSkills" classname="com.mobclaw.android.skill.SkillRegistryTest" time="0.001"/>
+  <testcase name="withDefaults_registersAllBuiltInSkills" classname="com.mobclaw.android.skill.SkillRegistryTest" time="0.0"/>
+  <testcase name="register_replacesDuplicate" classname="com.mobclaw.android.skill.SkillRegistryTest" time="0.0"/>
+  <testcase name="findMatchingSkills_matchesSingleKeyword" classname="com.mobclaw.android.skill.SkillRegistryTest" time="0.0"/>
+  <testcase name="findMatchingSkills_matchesMultipleSkills" classname="com.mobclaw.android.skill.SkillRegistryTest" time="0.0"/>
+  <testcase name="buildSkillPrompt_includesSkillName" classname="com.mobclaw.android.skill.SkillRegistryTest" time="0.001"/>
+  <testcase name="findMatchingSkills_caseInsensitive" classname="com.mobclaw.android.skill.SkillRegistryTest" time="0.0"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>
