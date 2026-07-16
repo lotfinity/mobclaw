@@ -13,12 +13,11 @@ class JsonActionDispatcher : ActionDispatcher {
     override fun parseResponse(response: ChatResponse): Pair<String, List<MobAction>> {
         val text = response.textOrEmpty()
 
-        // If response has native tool calls, use them directly
         if (response.hasToolCalls()) {
             val actions = response.toolCalls.map { tc ->
                 val args = try {
                     Json.parseToJsonElement(tc.arguments).jsonObject
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     buildJsonObject {}
                 }
                 MobAction(
@@ -30,7 +29,6 @@ class JsonActionDispatcher : ActionDispatcher {
             return Pair(text, actions)
         }
 
-        // Fallback: try to parse <tool_call> XML tags from text
         val calls = mutableListOf<MobAction>()
         val textParts = mutableListOf<String>()
         var remaining = text
@@ -51,8 +49,8 @@ class JsonActionDispatcher : ActionDispatcher {
                 val name = parsed["name"]?.jsonPrimitive?.content ?: continue
                 val arguments = parsed["arguments"]?.jsonObject ?: buildJsonObject {}
                 calls.add(MobAction(name = name, arguments = arguments))
-            } catch (e: Exception) {
-                // Malformed tool call, skip
+            } catch (_: Exception) {
+                // Malformed tool call, skip.
             }
 
             remaining = remaining.substring(end + 12)
@@ -75,6 +73,15 @@ class JsonActionDispatcher : ActionDispatcher {
     }
 
     override fun promptInstructions(tools: List<MobTool>): String = buildString {
+        appendLine("## Visual Screen Control")
+        appendLine()
+        appendLine("The latest screen observation includes an attached FULL Android screenshot.")
+        appendLine("Numbered boxes are synthetic action markers. Read all original text, icons, dialogs, spatial relationships, and unmarked values directly from the image.")
+        appendLine("For a numbered target, call click/long_click/input_text with BOTH snapshot_id and marker_id.")
+        appendLine("Marker numbers are valid only for the snapshot in the same observation. Never reuse a marker after the screen changes.")
+        appendLine("Use node_id only when the observation explicitly says the visual screenshot is unavailable and provides a text-tree fallback.")
+        appendLine("Use tap(x,y) for a visually apparent target that has no marker, such as Canvas, map, game, or inaccessible WebView content.")
+        appendLine()
         appendLine("## Tool Use Protocol")
         appendLine()
         appendLine("To use a tool, wrap a JSON object in <tool_call></tool_call> tags:")
@@ -96,7 +103,7 @@ class JsonActionDispatcher : ActionDispatcher {
     }
 
     override fun toProviderMessages(history: List<ConversationMessage>): List<ChatMessage> {
-        return history.flatMap { msg ->
+        val messages = history.flatMap { msg ->
             when (msg) {
                 is ConversationMessage.Chat -> listOf(msg.message)
                 is ConversationMessage.AssistantToolCalls -> {
@@ -109,7 +116,20 @@ class JsonActionDispatcher : ActionDispatcher {
                     listOf(ChatMessage.user("[Tool results]\n$content"))
                 }
             }
+        }.toMutableList()
+
+        // Attach only the newest screenshot. Previous observations remain cheap
+        // text summaries, so request size does not grow by one image per turn.
+        val observation = ScreenObservationStore.current ?: return messages
+        val marker = "Snapshot: #${observation.snapshotId}"
+        val index = messages.indexOfLast { message ->
+            message.role == "user" && message.content.contains(marker)
         }
+        if (index >= 0) {
+            messages[index] = messages[index].copy(imageDataUrl = observation.imageDataUrl)
+        }
+
+        return messages
     }
 
     override fun shouldSendToolSpecs(): Boolean = false
