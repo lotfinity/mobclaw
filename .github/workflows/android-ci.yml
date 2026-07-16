@@ -30,4 +30,4 @@ jobs:
         run: chmod +x gradlew
 
       - name: Compile MobClaw and test app
-        run: ./gradlew :mobclaw:compileDebugKotlin :app:compileDebugKotlin --stacktrace
+        run: ./gradlew :mobclaw:compileDebugKotlin :app:compileDebugKotlin --console=plain --quiet
