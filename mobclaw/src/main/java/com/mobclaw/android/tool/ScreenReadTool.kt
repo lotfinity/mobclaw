@@ -2,6 +2,7 @@ package com.mobclaw.android.tool
 
 import com.mobclaw.android.accessibility.ScreenReader
 import com.mobclaw.android.accessibility.VisualScreenReader
+import com.mobclaw.android.model.ScreenObservationStore
 import com.mobclaw.android.model.ToolResult
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -33,6 +34,10 @@ class ScreenReadTool : MobTool {
         if (visual != null) {
             return ToolResult(true, visual.toPromptText())
         }
+
+        // Never let the provider attach a previous screen's image to a fresh
+        // text-only fallback observation.
+        ScreenObservationStore.current = null
 
         val state = ScreenReader.read()
             ?: return ToolResult(
