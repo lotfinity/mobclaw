@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.0.3
+
+### Repeatable testing
+
+- Added a built-in test preset picker on the Task screen.
+- Included five reusable benchmarks: Camera mode, Android version, Full system info, Settings search, and Navigation recovery.
+- Selecting a preset fills the normal editable task field but never starts execution automatically.
+- Editing a preset prompt switches the selector back to Custom.
+- Bumped the app to version `1.0.3` (`versionCode 4`).
+
 ## 1.0.2
 
 ### Build identification
