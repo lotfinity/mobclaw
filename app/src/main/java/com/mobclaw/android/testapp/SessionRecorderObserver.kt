@@ -1,10 +1,13 @@
 package com.mobclaw.android.testapp
 
 import android.content.Context
+import android.util.Base64
 import com.mobclaw.android.model.ChatMessage
 import com.mobclaw.android.model.ChatResponse
 import com.mobclaw.android.model.ExecutionTrace
 import com.mobclaw.android.model.ForegroundInfo
+import com.mobclaw.android.model.ScreenObservation
+import com.mobclaw.android.model.ScreenObservationStore
 import com.mobclaw.android.model.ScreenState
 import com.mobclaw.android.observer.MobObserver
 import kotlinx.serialization.Serializable
@@ -48,7 +51,8 @@ class SessionRecorderObserver(
     private val provider: String,
     private val model: String?,
 ) : MobObserver {
-    private val directory = SessionStore.sessionDirectory(context)
+    private val appContext = context.applicationContext
+    private val directory = SessionStore.sessionDirectory(appContext)
     private var session: RecordedSession? = null
     private var sessionFile: File? = null
     private var eventSequence = 0
@@ -58,6 +62,10 @@ class SessionRecorderObserver(
     override fun onAgentStart(task: String) {
         val id = UUID.randomUUID().toString()
         sessionFile = File(directory, "$id.json")
+        SessionStore.sessionAssetDirectory(appContext, id).apply {
+            deleteRecursively()
+            mkdirs()
+        }
         session = RecordedSession(
             sessionId = id,
             provider = provider,
@@ -66,6 +74,7 @@ class SessionRecorderObserver(
             startedAtEpochMs = System.currentTimeMillis(),
         )
         eventSequence = 0
+        currentTrace = null
         appendEvent("agent_start", data = buildJsonObject { put("task", limited(task)) })
     }
 
@@ -118,7 +127,18 @@ class SessionRecorderObserver(
                 put("model", model ?: this@SessionRecorderObserver.model.orEmpty())
                 put("temperature", temperature)
                 put("toolNames", JSON.encodeToJsonElement(toolNames))
-                put("messages", JSON.encodeToJsonElement(messages.map { it.copy(content = limited(it.content)) }))
+                put("imageCount", messages.count { !it.imageDataUrl.isNullOrBlank() })
+                put(
+                    "messages",
+                    JSON.encodeToJsonElement(
+                        messages.map {
+                            it.copy(
+                                content = limited(it.content),
+                                imageDataUrl = null,
+                            )
+                        },
+                    ),
+                )
             },
         )
     }
@@ -168,6 +188,10 @@ class SessionRecorderObserver(
         nodeCount: Int,
         content: String,
     ) {
+        val observation = ScreenObservationStore.current
+            ?.takeIf { it.packageName == packageName && content.contains(it.snapshotId.toString()) }
+        val screenshot = observation?.let(::persistObservationScreenshot)
+
         appendEvent(
             type = "screen_read",
             iteration = iteration,
@@ -175,6 +199,17 @@ class SessionRecorderObserver(
                 put("packageName", packageName)
                 put("nodeCount", nodeCount)
                 put("content", limited(content))
+                observation?.let {
+                    put("snapshotId", it.snapshotId)
+                    put("screenshotWidth", it.width)
+                    put("screenshotHeight", it.height)
+                    put("screenshotAnnotated", true)
+                }
+                screenshot?.let {
+                    put("screenshotFile", it.name)
+                    put("screenshotMimeType", "image/jpeg")
+                    put("screenshotBytes", it.length())
+                }
             },
         )
     }
@@ -230,11 +265,26 @@ class SessionRecorderObserver(
     }
 
     override fun onVerificationCompleted(passed: Boolean, notes: String) {
+        val observation = ScreenObservationStore.current
+        val screenshot = observation?.let(::persistObservationScreenshot)
+
         appendEvent(
             type = "verification_completed",
             data = buildJsonObject {
                 put("passed", passed)
                 put("notes", limited(notes))
+                observation?.let {
+                    put("snapshotId", it.snapshotId)
+                    put("packageName", it.packageName)
+                    put("screenshotWidth", it.width)
+                    put("screenshotHeight", it.height)
+                    put("screenshotAnnotated", true)
+                }
+                screenshot?.let {
+                    put("screenshotFile", it.name)
+                    put("screenshotMimeType", "image/jpeg")
+                    put("screenshotBytes", it.length())
+                }
             },
         )
     }
@@ -272,6 +322,23 @@ class SessionRecorderObserver(
         persist()
     }
 
+    private fun persistObservationScreenshot(observation: ScreenObservation): File? {
+        val current = session ?: return null
+        val encoded = observation.imageDataUrl.substringAfter(',', missingDelimiterValue = "")
+        if (encoded.isBlank()) return null
+
+        return runCatching {
+            val destination = File(
+                SessionStore.screenshotDirectory(appContext, current.sessionId),
+                "${observation.snapshotId}.jpg",
+            )
+            if (!destination.exists()) {
+                destination.writeBytes(Base64.decode(encoded, Base64.DEFAULT))
+            }
+            destination
+        }.getOrNull()
+    }
+
     private fun persist() {
         val current = session ?: return
         val destination = sessionFile ?: return
@@ -297,6 +364,17 @@ object SessionStore {
 
     fun sessionDirectory(context: Context): File =
         File(context.filesDir, "mobclaw-sessions").apply { mkdirs() }
+
+    fun sessionAssetDirectory(context: Context, sessionId: String): File =
+        File(sessionDirectory(context), "$sessionId-assets").apply { mkdirs() }
+
+    fun screenshotDirectory(context: Context, sessionId: String): File =
+        File(sessionAssetDirectory(context, sessionId), "screenshots").apply { mkdirs() }
+
+    fun screenshotFile(context: Context, sessionId: String, fileName: String): File? {
+        val file = File(screenshotDirectory(context, sessionId), File(fileName).name)
+        return file.takeIf { it.isFile }
+    }
 
     fun sessionCount(context: Context): Int = sessionFiles(context).size
 
@@ -367,6 +445,10 @@ object SessionStore {
 
     fun clear(context: Context) {
         sessionFiles(context).forEach(File::delete)
+        sessionDirectory(context)
+            .listFiles { file -> file.isDirectory && file.name.endsWith("-assets") }
+            .orEmpty()
+            .forEach(File::deleteRecursively)
     }
 
     private fun sessionFiles(context: Context): List<File> =

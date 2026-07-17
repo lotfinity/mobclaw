@@ -1,2 +1,0 @@
-int string mobclaw_accessibility_description 0x0
-int xml accessibility_service_config 0x0

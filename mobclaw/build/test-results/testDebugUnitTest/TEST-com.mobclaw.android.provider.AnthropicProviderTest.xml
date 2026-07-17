@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<testsuite name="com.mobclaw.android.provider.AnthropicProviderTest" tests="2" skipped="0" failures="0" errors="0" timestamp="2026-07-16T06:40:57" hostname="inspiron-gnmd" time="0.247">
-  <properties/>
-  <testcase name="parseNoContentReturnsDefaultText" classname="com.mobclaw.android.provider.AnthropicProviderTest" time="0.24"/>
-  <testcase name="chat_parsesTextAndToolCallsAndBuildsBody" classname="com.mobclaw.android.provider.AnthropicProviderTest" time="0.007"/>
-  <system-out><![CDATA[]]></system-out>
-  <system-err><![CDATA[]]></system-err>
-</testsuite>

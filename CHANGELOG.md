@@ -1,5 +1,23 @@
 # Changelog
 
+## 1.0.3
+
+### Repeatable testing
+
+- Added a built-in test preset picker on the Task screen.
+- Included five reusable benchmarks: Camera mode, Android version, Full system info, Settings search, and Navigation recovery.
+- Selecting a preset fills the normal editable task field but never starts execution automatically.
+- Editing a preset prompt switches the selector back to Custom.
+- Bumped the app to version `1.0.3` (`versionCode 4`).
+
+## 1.0.2
+
+### Build identification
+
+- Bumped the screenshot-debug build to version `1.0.2` (`versionCode 3`).
+- Added an always-visible footer below the navigation bar with version name, version code, and build type.
+- Installed builds can now be matched immediately against `adb dumpsys package` output.
+
 ## 1.0.1
 
 ### Session debugging
@@ -7,6 +25,10 @@
 - Single-session JSON sharing directly from each session card.
 - Full-screen session debugger with timeline and raw JSON preview.
 - External JSON viewer action for inspecting the exact shared file.
+- Annotated screenshots are stored for every visual screen observation and final verification snapshot.
+- Observation events show image thumbnails that open into a full-screen preview.
+- Per-session sharing now creates a ZIP containing `session.json` and all observation screenshots.
+- Recorded model requests keep image counts but no longer duplicate base64 screenshot payloads in JSON.
 
 ### Agent flow
 
