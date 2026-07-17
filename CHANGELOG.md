@@ -5,7 +5,7 @@
 ### Build identification
 
 - Bumped the screenshot-debug build to version `1.0.2` (`versionCode 3`).
-- Added an always-visible footer with version name, version code, and build type.
+- Added an always-visible footer below the navigation bar with version name, version code, and build type.
 - Installed builds can now be matched immediately against `adb dumpsys package` output.
 
 ## 1.0.1
