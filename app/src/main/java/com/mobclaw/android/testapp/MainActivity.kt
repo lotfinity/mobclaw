@@ -135,31 +135,45 @@ class MainActivity : ComponentActivity() {
                 )
             },
             bottomBar = {
-                NavigationBar {
-                    NavigationBarItem(
-                        icon = { Text("\u2699\uFE0F") },
-                        label = { Text("Task") },
-                        selected = currentScreen == Screen.Task.ordinal,
-                        onClick = { currentScreen = Screen.Task.ordinal },
-                    )
-                    NavigationBarItem(
-                        icon = { Text("\uD83D\uDCCB") },
-                        label = { Text("Sessions") },
-                        selected = currentScreen == Screen.Sessions.ordinal,
-                        onClick = { currentScreen = Screen.Sessions.ordinal },
-                    )
-                    NavigationBarItem(
-                        icon = { Text("\uD83D\uDD17") },
-                        label = { Text("Providers") },
-                        selected = currentScreen == Screen.Providers.ordinal,
-                        onClick = { currentScreen = Screen.Providers.ordinal },
-                    )
-                    NavigationBarItem(
-                        icon = { Text("\u2699\uFE0F") },
-                        label = { Text("Settings") },
-                        selected = currentScreen == Screen.Settings.ordinal,
-                        onClick = { currentScreen = Screen.Settings.ordinal },
-                    )
+                Column {
+                    NavigationBar {
+                        NavigationBarItem(
+                            icon = { Text("\u2699\uFE0F") },
+                            label = { Text("Task") },
+                            selected = currentScreen == Screen.Task.ordinal,
+                            onClick = { currentScreen = Screen.Task.ordinal },
+                        )
+                        NavigationBarItem(
+                            icon = { Text("\uD83D\uDCCB") },
+                            label = { Text("Sessions") },
+                            selected = currentScreen == Screen.Sessions.ordinal,
+                            onClick = { currentScreen = Screen.Sessions.ordinal },
+                        )
+                        NavigationBarItem(
+                            icon = { Text("\uD83D\uDD17") },
+                            label = { Text("Providers") },
+                            selected = currentScreen == Screen.Providers.ordinal,
+                            onClick = { currentScreen = Screen.Providers.ordinal },
+                        )
+                        NavigationBarItem(
+                            icon = { Text("\u2699\uFE0F") },
+                            label = { Text("Settings") },
+                            selected = currentScreen == Screen.Settings.ordinal,
+                            onClick = { currentScreen = Screen.Settings.ordinal },
+                        )
+                    }
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                    ) {
+                        Text(
+                            text = "MobClaw v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE}) · ${BuildConfig.BUILD_TYPE}",
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        )
+                    }
                 }
             },
         ) { padding ->
