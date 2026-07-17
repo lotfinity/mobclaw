@@ -1,0 +1,34 @@
+name: Apply visible app version
+
+on:
+  push:
+    branches:
+      - feature/session-observation-screenshots
+    paths:
+      - scripts/apply_visible_app_version.py
+      - .github/workflows/apply-visible-app-version.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out branch
+        uses: actions/checkout@v4
+        with:
+          ref: feature/session-observation-screenshots
+          fetch-depth: 0
+
+      - name: Apply visible version footer
+        run: python3 scripts/apply_visible_app_version.py
+
+      - name: Commit generated changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: display app version in footer"
+          git push origin HEAD:feature/session-observation-screenshots
